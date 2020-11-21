@@ -1,1 +1,1 @@
-export * from './lib/number';
+export const placeholder = 'Watch this space';
