@@ -1,5 +1,5 @@
 /* Copyright 2020 The Rational Index Project Developers. See the LICENSE
-file at the top-level directory of this distribution and at 
+file at the top-level directory of this distribution and at
 https://github.com/zandaleph/rational-index/blob/main/LICENSE */
 
 // MAX_SAFE_INTEGER is 2^53 - 1
