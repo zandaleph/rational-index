@@ -4,14 +4,15 @@
   "parserOptions": { "project": "./tsconfig.json" },
   "env": { "es6": true },
   "ignorePatterns": ["node_modules", "build", "coverage"],
-  "plugins": ["import", "eslint-comments", "license-header"],
+  "plugins": ["import", "eslint-comments", "license-header", "jsdoc"],
   "extends": [
     "eslint:recommended",
     "plugin:eslint-comments/recommended",
     "plugin:@typescript-eslint/recommended",
     "plugin:import/typescript",
     "prettier",
-    "prettier/@typescript-eslint"
+    "prettier/@typescript-eslint",
+    "plugin:jsdoc/recommended"
   ],
   "globals": { "BigInt": true, "console": true, "WebAssembly": true },
   "rules": {
@@ -29,6 +30,17 @@
       "error",
       { "ignoreDeclarationSort": true, "ignoreCase": true }
     ],
-    "license-header/header": [ "error", "./resources/license-header.txt" ]
+    "license-header/header": [ "error", "./resources/license-header.txt" ],
+    "jsdoc/require-jsdoc": [
+      "error",
+      {
+        "require": {
+          "ClassDeclaration": true,
+          "FunctionDeclaration": true,
+          "MethodDefinition": true
+        },
+        "contexts": ["ExportNamedDeclaration", "TSTypeAliasDeclaration", "ClassProperty"]
+      }
+    ]
   }
 }
