@@ -1,0 +1,272 @@
+
+
+
+Computes sparse ordered positions to maintain list ordering with (hopefully) minimal position edits during insert operations.
+
+use cases:
+
+create first entry
+insert between entry and beginning/end
+
+insert between two entries
+create two entries between two entries (split)
+swap two entries between two entries (?)
+
+create N entries between two entries (covers insert, create, and swap)
+
+replace N entries with M entries between two entries
+remove an entry between two entries? - optionally make space if pressing need?
+
+probability of creating entry before vs after - bias
+probability of creating entry before vs after given location in list - bias gradient?
+
+how to handle lack of space?
+a/ walk one entry up / down and see if there's space, repeat until there is
+b/ reason about overall density and adjust enough to normalize density somewhat
+c/ rebalance everything
+
+Wrinkle I've been working on is how to deal with a paginated list.
+
+case in point, imagine the following indicies:
+
+[0, 1, 2, 3, 4, ...]
+
+and we want to insert before 0.  We don't know what index is free after 4.
+
+...
+
+Stepping back a bit, let's talk about rebalancing as a general problem.
+
+from prior experience, I know that rebalancing becomes exponentially more
+difficult the less space you have to work with.  This whole scheme works on
+the assumption that most indicies are sparse and there's always lots of
+room to find another. So, we should consider the merits of knowing when to
+say "you know what?  This space is too crowded to rebalance and we can't do
+it".
+
+OTOH, the whole reason we went with string IDs instead of numerical ones is
+that we can always find room at the cost of a bit more storage space.  e.g.
+
+Inserting between "AAAAA" and "AAAAB" we can add "AAAAAT" and suddenly have
+room for 31 more items on each side of the new item.
+
+The downside of this approach is that if a lot of activity is focused in a
+small area, we can (slowly) start using more storage than we strictly need,
+because there's lots more space elsewhere.
+
+One way to think about this is a cost tradeoff, with the costs being:
+
+* cost of a rebalance (A user-facing delay as we store more data)
+* cost of additional storage space (and network bandwidth, memory, etc)
+* cost of ???
+
+Let's try an example:
+
+let's imagine instead of rebalancing we always subdivide the local space by
+adding another character to the key.  In a worse case scenario, every
+insertion requires another bit of precision (imagine 1/2, 1/4, 1/8, ...) so
+with Base64, every sixth insertion requires an additional byte of storage
+space for all subsequent insertions.  Pathologically, after 100 insertions
+this could require
+
+  6 * sum_i=0_(100/6) i = 6 * (17 * 18 / 2) = 918 bytes
+
+whereas 100 insertions with a static 5 byte representation requires only 500
+bytes.  If we increase this to 1000, the comparison become 95kb to 5kb.  At
+10k insertions, 9.4MB to 50kB.  Repartitioning is O(n) storage, subdividing
+is O(n**2) storage.
+
+If we instead compare the number of writes to the backing database a
+rebalancer needs to rebalance whenever indicies become non-sparse.  The
+number of writes depends on how much of the space is non-sparse, which
+we control by how much we decide to rebalance each time we perform that
+operation.  If we do a minimal rebalance each time, then we'll have a bit
+of a 1, 2, 1, 4, 1, 2, 1, 8... pattern to our costs, I think. Let's try an
+example:
+
+if we're always inserting left, eventually we'll get to:
+
+[0, 1, 2, 4, 8, 16, 32, 64, ...]
+
+to insert left again, we'll need to insert [new, 0, 1, 2] before 4.
+
+[0, 1, 2, 3, 4, ...]
+
+next we'll need to insert [new, 0, 1, 2, 3, 4] before 8.
+
+[0, 2, 3, 5, 6, 8, ...]
+
+and [new, 0] before 2, then [new, 0, 1, 2, 3] before 5, then 
+[new, 0, ... 6] before 8 and [new, 0, ... 7, 8] before 16].
+
+[0, 2, 4, 5, 7, 9, 10, 12, 14, 16, 32...]
+
+If we look at the real pattern of how many elements we need to touch for each
+insertion, it's
+
+4, 6, 2, 5, 7, 9, 2, 4, 7, 9, 12, 14, 15, 17...
+
+After the first 6 insertions, we average 5 updates per insertion.  After 14,
+that increases to 7.5 updates per insertion.  For the next 16, the first half
+will have about the same average, and the second half will average over 16,
+bringing the overall average up to ~10.
+
+[0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 14, 16, 32...]
+
+... 2, 4, 7, 9, 12, 14, 16, 17
+
+n log n updates versus n ** 2 storage.  Writes are $1.25 per million, or
+$1.25e-6.  Storage is $0.25 per GB/month, or $2.5e-10 b/mo.  Almost 4 orders
+of magnitude separate these two, so we'd have to be quite outrageously scaled
+to have the complicated, continuous rebalancing outweigh the simple expansion
+of the index.  And that's assuming I'm right about the insertion complxity - 
+if I'm underestimating and it's n**2, we should always use the more storage.
+
+-----
+
+Okay, time for another philosophical debate!  What should the index be for
+"halfway" between 1.5 and 3.5?  2, 3, or 2.5?  2.5 is the most correct, while
+2 and 3 preserve a "prefer shorter values" motif.  Does the answer change if
+the bounds are instead 1.9 and 3.9?  How about 1 and 4?
+
+My worry about choosing more mathematically accurate answers is that
+intuitively (for me, at least), it seems very difficult to land on shorter 
+indicies.  1.0 is not the same as 1.
+
+Maybe herein lies my problem.  I'd been thinking that 'a' < 'a+', despite '+'
+having a value of 0.  If instead I trim all trailing '+', I lose a little bit
+of representation density, but I gain a simpler calculation. (ed. this is
+more obvious when using decimal digits so I'm using real encoding in this
+example to illustrate why it isn't 100% obvious to do this trimming.)
+
+So returning to our previous examples, the differences are 2, 2, and 3, and we
+are only seeking a single insertion, so gaps of 1, 1, and 1.5 are desired.
+This leads to reasonably simple values given the context, 2.5, 2.9, and 2.5.
+
+But, if we start looking at more nuanced examples, like what midpoint should
+we choose between 1.0785 and 4.0125, while we could compute the exact midpoint
+of 2.5455, these numbers differ in their very first digit.  Perhaps to
+simplify our handling of these more complicated cases, we could limit the
+number of digits we go beyond that most significant digit with difference?  I
+am reminded of a seemingly similar concept in physics and chemistry to use
+significant figures and not record the rest as it is "in the noise".  So
+instead I suggest that the midpoint we use should be just 2.5.
+
+Does this logic always hold up? Let's try a narrower range, like 1.999 and
+2.099.  Exact midpoint would be 2.049.  But does that level of accuracy make
+sense when the example is 1.999 and 200.099?
+
+Maybe we can tune precision to delta between endpoints?  If our delta is 0.1,
+then we could aim for an accuracy like "nearest 0.01".  So in the 1.999/2.099
+case, we'd choose 2.05 (rounding to the nearest 0.01 from 2.049).  In the 
+1.999/200.099 case, the delta is 198.1, so around 19.8 or 20 would do for 
+precision, which would give us 100. How do we choose 20 from 19.8?  If I'd
+said 10 the answer would have been the same, so maybe the answer is "closest"
+order of magnitude?  a la 5 to 50 is 10, 50 to 500 is 100, etc.
+
+With other bases, does a similar method work?  In base 64, would a delta of
+anywhere from 8 to 512 simplify to a precision of 1?  Maybe that's a bit
+overly generous with so much space, so how could we tune that?  We could 
+subdivide into half orders of magnitude?  sqrt(8) rounds to 3, so for 3 to 
+24 we could round to nearest half, and for 24 to 192 we could round to nearest
+whole. Doing thirds, 21.5 and 43.5 is a pretty good start.
+
+This does point out that my bounds for 10s are wrong, it should be 3 to 30,
+30 to 300, etc.  If I go with the same thirds experiment there, 3 and 7 is
+still a reasonable answer.  Between 3 and 7, if we do thirds again how we
+define delta starts to matter.  If it is the overall delta, we end up with
+4 and 6, which is okay, but if we use the delta / (count + 1), then we'd end
+up with 4.3 and 5.7, which is a lot closer to "even".  Since count could be
+quite high it makes sense to use this second formulation.
+
+Another observation, perhaps non-sequitur, but - we can never use 0 as a
+point, even when inserting at the start of the list.  If we do so, it can
+never have a point inserted before it, so it would be fixed as the first
+element forever.
+
+Intuitively I seem to be able to understand base 10 better than base 64. I
+wonder if I can write the code in such a way that most tests can be run in
+base 10 (or maybe base 16 to test half orders of magnitude), but still work
+for base 64.
+
+okay so splitting (1.99, 2.01) into quarters gives [1.995, 2, 2.005].  This
+starts to show that even small deltas (in this case, 0.005) can require
+changes in the most significant digit, so we have to keep a representation
+of the entire number available for maths, which means big integers.  However,
+if the delta is large enough, can we ignore less significant digits?
+
+from the most significant digit, say, 3 and 7, we can determine the the
+maximum possible delta is 2.5 (half of 7.99999 - 3.0).  Thus we'd need to be
+accurate to the second digit only.  The minimum, (half of 3.999 - 7) is 1.5,
+which is this case has the same order of magnitude, but conceivably could be
+crossing that boundary.  As we should be ready for the most needfully accurate
+point, we'll use the minimum possible delta to compute that.
+
+So if we were considering instead 1.999 and 9 in half, the true delta is 3.5,
+which means we'd use whole digits to select the midpoint.  If we used full
+accuracy, we'd compute 1.999+3.49995 = 5.49985, and round to 5.  If we only
+use the most significant digits, we'd compute 1 + 4 = 5.  Let's flip the
+example and make sure it works in reverse.
+
+1 and 9.999 in half, true delta is 4.5.  Full accuracy = 1 + 4.4995 = 5.4995,
+which rounds to 5.  MSD only, 1 + 4 = 5.  This works.  What about 1.999 to 
+9.999 in half?  delta is 4, Full accuracy = 1.999 + 4 = 5.999, rounds to 6.
+MSD only?  1 + 4 = 5, which doesn't match.  So if we look at one more digit:
+1.9 + 4 = 5.9, which rounds to 6.  Intuitively from this, we need one more
+digit than our minimum delta suggests we will.
+
+
+1234  -> 12340
+
+12345
+
+1/2 -> .5
+1/3 -> .33
+
+
+1234
+  12345
+
+  |---|    max len
+       ||  workspace
+  1234500
+  1234000
+       || delta len
+       50 (count = 9, 10 divisions)
+  123405
+  12341
+  123415
+  12342
+
+
+  123450
+  123400
+      25 (count = 1, 2 divisions)
+  123425
+  ...
+
+
+  123450
+  123000
+     225 (count = 1, 2 divisions)
+  12323
+
+  123950
+  123000
+     425
+  1234
+
+  123450
+  120000
+    1725
+  1217
+
+  129450
+  120000
+    4725
+  125
+
+ 1000000
+  000000
+   10000
+  010
