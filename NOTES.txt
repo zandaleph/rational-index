@@ -270,3 +270,41 @@ digit than our minimum delta suggests we will.
   000000
    10000
   010
+
+
+
+
+Key-Value store:
+
+
+"asdg;alksjvaee" : { text: "Save the todo list somewhere!", isDone: false, order: 1 }
+"acvlkjglsknvls" : { text: "Make a Todo", isDone: false, order: 2 }
+"lkjlkxvaaaasSd" : { text: "Eat that Todo", ... order: 2.5 }
+"lkcjvlskdmflks" : { text: "asdfffds", isDone: false, order: 3 }
+... 100 more todo:
+
+numbers have limited precision
+
+
+0.0000000000001
+0.00000000000011
+
+
+
+
+----
+
+options are:
+
+* - (cons: implies negative, often used as range syntax)
+* . (cons: implies beginning of fractional portion, confusing)
+* _ (cons: implies space, sometimes used to group digits ala 1_000_000)
+* ~ (cons: not well supported by OLDER (pre 2005) browsers, means 'home')
+* : (cons: often used as a range syntax)
+* @ (cons: often used as a joiner between two concepts (foo 'at' bar))
+
+Good pairings:
+* - and _ : consistent lines
+* . and : : consistent dots
+* Some mix of the above : 'dash' and 'dot' easily distinguishable
+* - and . specifically: conveniently before 0-9 in ASCII code.
