@@ -40,7 +40,7 @@ type Index = StartIndex | EndIndex;
  * However, neither of these properties should be considered supported.
  */
 export const DEFAULT_BASE64_ALPHABET =
-  '+-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  '-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 /**
  * Provides utilities for creating new indicies with a given alphabet.
@@ -110,11 +110,9 @@ export class Inserter {
     } else if (index === LIST_TAIL) {
       return bigInt(this.base).pow(length);
     } else {
-      return bigInt(
-        index.padEnd(length, this.zero),
-        this.base,
-        this.alphabet.join(''),
-        true
+      return bigInt.fromArray(
+        Array.from(index.padEnd(length, this.zero)).map((l) => this.lookup[l]),
+        this.base
       );
     }
   }
