@@ -17,12 +17,12 @@ export const LIST_TAIL = 2;
 /**
  * Represents the start of an insertion range.
  */
-type StartIndex = string | typeof LIST_HEAD;
+export type StartIndex = string | typeof LIST_HEAD;
 
 /**
  * Represents the end of an insertion range.
  */
-type EndIndex = string | typeof LIST_TAIL;
+export type EndIndex = string | typeof LIST_TAIL;
 
 /**
  * Represents the start or end of an insertion range.
