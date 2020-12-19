@@ -5,12 +5,12 @@ https://github.com/zandaleph/rational-index/blob/main/LICENSE */
 import bigInt, { BigInteger } from 'big-integer';
 
 /**
- * Value representing no smaller indicies exist.
+ * Value representing that no smaller indicies exist.
  */
 export const LIST_HEAD = 1;
 
 /**
- * Value representing no larger indicies exist.
+ * Value representing that no larger indicies exist.
  */
 export const LIST_TAIL = 2;
 
@@ -39,7 +39,7 @@ type Index = StartIndex | EndIndex;
  *
  * However, neither of these properties should be considered supported.
  */
-export const DEFAULT_BASE64_ALPHABET =
+const DEFAULT_BASE64_ALPHABET =
   '-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 /**
