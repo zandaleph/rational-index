@@ -1,7 +1,7 @@
 # rational-index
 
 Implements the rational index spec, which allows for efficient implementation
-of reorderable lists in an indexed store.  Key principles are:
+of re-orderable lists in an indexed store.  Key principles are:
 
 * Insertion anywhere in the list does not modify other elements.
 * Thus, moving an item within a list also does not modify other elements.
@@ -42,10 +42,10 @@ const [first] = inserter.insert(LIST_HEAD, LIST_TAIL);
 const [zeroth] = inserter.insert(LIST_HEAD, first);
 
 // Insert three items after the first
-const [second, third, fouth] = inserter.insert(first, LIST_TAIL, 3);
+const [second, third, fourth] = inserter.insert(first, LIST_TAIL, 3);
 
 // Insert between first and second
-const [three_halvesth] = inserter.insert(first, second);
+const [three_halves_th] = inserter.insert(first, second);
 ```
 
 
