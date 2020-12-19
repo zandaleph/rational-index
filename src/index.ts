@@ -3,6 +3,12 @@ file at the top-level directory of this distribution and at
 https://github.com/zandaleph/rational-index/blob/main/LICENSE */
 
 /**
- * This is a placeholder for future library exports.
+ * The main export of this library - [[Inserter]].
  */
-export const placeholder = 'Watch this space';
+export {
+  Inserter,
+  StartIndex,
+  EndIndex,
+  LIST_HEAD,
+  LIST_TAIL,
+} from './lib/inserter';
